@@ -23,10 +23,12 @@ public class Terrain_Generator : EditorWindow
     public GameObject generatedTerrain;
     public GameObject[] childrenTiles;
 
-    public Material terrainMaterial;
+    public Material terrainMaterial = null;
 
-    public Texture2D heightMap;
-    public int heightMapScale;
+    public Texture2D heightMap1 = null;
+    public Texture2D heightMap2 = null;
+    public int heightMapScale = 20;
+    public int heightMapCount = 1;
 
     Mesh mesh;
 
@@ -34,14 +36,12 @@ public class Terrain_Generator : EditorWindow
     int[] triangles;
     Vector2[] uvs;
 
-    public int tileSize = 250;
+    public int tileSize = 64;
 
-    [Range(1,15)]
     public int xGridSize = 1;
-    [Range(1,15)]
     public int zGridSize = 1;
 
-    AnimBool showGridVariables, showTileVariables;
+    AnimBool showGridVariables, showTileVariables, showHeightMaps;
 
     private void OnEnable()
     {
@@ -52,6 +52,9 @@ public class Terrain_Generator : EditorWindow
 
         showTileVariables = new AnimBool(false);
         showTileVariables.valueChanged.AddListener(Repaint);
+
+        showHeightMaps = new AnimBool(false);
+        showHeightMaps.valueChanged.AddListener(Repaint);
     }
 
     void OnGUI()
@@ -60,6 +63,11 @@ public class Terrain_Generator : EditorWindow
 
         GUILayout.Label("Terrain Generator", EditorStyles.boldLabel);
 
+        //GUILayout.Space(10);
+
+        //GUILayout.Label("Please enter the size that you want each tile to be.", EditorStyles.boldLabel);
+        //tileSize = EditorGUILayout.IntField("Tile Size", tileSize);
+
         GUILayout.Space(10);
 
         GUILayout.Label("Please insert your preferred material into the field below.", EditorStyles.boldLabel);
@@ -67,76 +75,63 @@ public class Terrain_Generator : EditorWindow
 
         GUILayout.Space(10);
 
+        //showHeightMaps.target = EditorGUILayout.ToggleLeft("Edit no. of height maps.", showHeightMaps.target);
+
+        //heightMapCount = EditorGUILayout.IntField("No. of height Maps.", heightMapCount);
+
         GUILayout.Label("Please insert your preferred height map into the field below.", EditorStyles.boldLabel);
-        heightMap = (Texture2D)EditorGUILayout.ObjectField(heightMap, typeof(Texture2D), true, GUILayout.Width(100), GUILayout.Height(100));
+
+        GUILayout.BeginHorizontal();
+
+        heightMap1 = (Texture2D)EditorGUILayout.ObjectField(heightMap1, typeof(Texture2D), true, GUILayout.Width(100), GUILayout.Height(100));
+
+        heightMap2 = (Texture2D)EditorGUILayout.ObjectField(heightMap2, typeof(Texture2D), true, GUILayout.Width(100), GUILayout.Height(100));
+
+        GUILayout.EndHorizontal();
+
         heightMapScale = EditorGUILayout.IntField("Scale", heightMapScale);
 
-        GUILayout.Space(10);
-
-        GUILayout.Label("Please enter the size that you want the tiles to be", EditorStyles.boldLabel);
-        tileSize = EditorGUILayout.IntField("Tile Size", tileSize);
-
-        GUILayout.EndVertical(); 
+        GUILayout.EndVertical();
 
         GUILayout.Space(10);
 
-        showGridVariables.target = EditorGUILayout.ToggleLeft("Edit Grid Size", showGridVariables.target);
+        GUILayout.BeginVertical("Box");
+
+        GUILayout.Label("Please Select a grid size.", EditorStyles.boldLabel);
+        //showGridVariables.target = EditorGUILayout.ToggleLeft("Edit Grid Size", showGridVariables.target);
 
         GUILayout.Space(10);
 
-        if (EditorGUILayout.BeginFadeGroup(showGridVariables.faded))
+        //showTileVariables.target = false;
+
+        xGridSize = EditorGUILayout.IntField("Grid Length", xGridSize);
+
+        zGridSize = EditorGUILayout.IntField("Grid height", zGridSize);
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Please select a tile to change the property of a single tile.", EditorStyles.boldLabel);
+
+        for (int i = 0, z = 0; z < zGridSize; z++)
         {
-
-            GUILayout.BeginVertical("Box");
-
-            showTileVariables.target = false;
-
-            xGridSize = EditorGUILayout.IntField("Grid Length", xGridSize);
-
-            zGridSize = EditorGUILayout.IntField("Grid height", zGridSize);
-
-            GUILayout.EndVertical();
-
-        }
-        else
-        {
-            GUILayout.Space(10);
-
-            GUILayout.BeginVertical("Box");
-
-            GUILayout.Label("Please select a tile to change the property of a single tile.", EditorStyles.boldLabel);
-
-            EditorGUI.indentLevel++;
-
-            for (int z = 0; z < zGridSize; z++)
+            GUILayout.BeginHorizontal();
+            for (int x = 0; x < xGridSize; x++)
             {
-                GUILayout.BeginHorizontal();
-                for (int x = 0; x < xGridSize; x++)
+                if(GUILayout.Button("(" + (x +1) + "," + (zGridSize-z) + ")", GUILayout.Width(35), GUILayout.Height(35)))
                 {
-                    GUILayout.Button("",GUILayout.Width(25), GUILayout.Height(25));
+                    Debug.Log("Selected: " + "(" + (x + 1) + "," + (zGridSize - z) + ")");
+                    Selection.activeObject = GameObject.Find("(" + (x + 1) + "," + (zGridSize - z) + ")");
+                    i++;
                 }
-                GUILayout.EndHorizontal();
             }
-
-            EditorGUI.indentLevel--;
-
-            GUILayout.Label("Toggle below represents a tile being selected.");
-            //Grid
-            showTileVariables.target = EditorGUILayout.ToggleLeft("Show a tiles variables", showTileVariables.target);
-
-            if (EditorGUILayout.BeginFadeGroup(showTileVariables.faded))
-            {
-                EditorGUI.indentLevel++;
-
-                GUILayout.Button("Variables for tiles here.");
-
-                EditorGUI.indentLevel--;
-            }
-            EditorGUILayout.EndFadeGroup();
-
-            GUILayout.EndVertical();
+            GUILayout.EndHorizontal();
         }
-        EditorGUILayout.EndFadeGroup();
+
+        //GUILayout.Label("Toggle below represents a tile being selected.");
+        //showTileVariables.target = EditorGUILayout.ToggleLeft("Show a tiles variables", showTileVariables.target);
+        //GUILayout.Button("Variables for tiles here.");
+
+        GUILayout.EndVertical();
 
         GUILayout.FlexibleSpace();
 
@@ -156,10 +151,9 @@ public class Terrain_Generator : EditorWindow
             DestroyImmediate(generatedTerrain);
         }
 
+        tileSize = 250;
+
         generatedTerrain = new GameObject("Generated Terrain");
-        generatedTerrain.AddComponent<MeshFilter>();
-        generatedTerrain.AddComponent<MeshRenderer>();
-        generatedTerrain.AddComponent<MeshCollider>();
 
         childrenTiles = new GameObject[xGridSize * zGridSize];
 
@@ -167,83 +161,94 @@ public class Terrain_Generator : EditorWindow
         {
             for (int x = 0; x < xGridSize; x++)
             {
-                childrenTiles[i] = new GameObject("X: " + (x + 1) + " Z: " + (z + 1));
+                childrenTiles[i] = new GameObject("(" + (x + 1) + "," + (z + 1) + ")");
                 childrenTiles[i].transform.parent = generatedTerrain.transform;
                 childrenTiles[i].AddComponent<MeshFilter>();
                 childrenTiles[i].AddComponent<MeshRenderer>();
                 childrenTiles[i].AddComponent<MeshCollider>();
+
+                mesh = new Mesh();
+                childrenTiles[i].GetComponent<MeshFilter>().mesh = mesh;
+
+                Texture2D heightmap = new Texture2D(0,0);
+                int index = (int)UnityEngine.Random.Range(-100,100);
+                if(index <= 0)
+                {
+                    heightmap = heightMap1;
+                    Debug.Log("1");
+                }
+                else if (index > 0)
+                {
+                    heightmap = heightMap2;
+                    Debug.Log("2");
+                }
+
+                Color[] pixels = heightmap.GetPixels(0, 0, heightmap.width, heightmap.height);           
+
+                vertices = new Vector3[(tileSize + 1) * (tileSize + 1)];
+                for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                {
+                    for (int xv = 0; xv <= tileSize; xv++)
+                    {
+                        Color color = pixels[(zv * heightmap.width) + xv];
+                        if (xv == 0 || xv == tileSize || zv == 0 || zv == tileSize)
+                        {
+                            //vertices[iv] = new Vector3(xv, 0, zv);
+                            vertices[iv] = new Vector3(xv, color.grayscale * heightMapScale, zv);
+                        }
+                        else
+                        {
+                            vertices[iv] = new Vector3(xv, color.grayscale * heightMapScale, zv);
+                        }
+                        iv++;
+                    }
+                }
+
+                triangles = new int[tileSize * tileSize * 6];
+                int vert = 0;
+                int tris = 0;
+                for (int zt = 0; zt < tileSize; zt++)
+                {
+                    for (int xt = 0; xt < tileSize; xt++)
+                    {
+                        triangles[tris + 0] = vert + 0;
+                        triangles[tris + 1] = vert + tileSize + 1;
+                        triangles[tris + 2] = vert + 1;
+                        triangles[tris + 3] = vert + 1;
+                        triangles[tris + 4] = vert + tileSize + 1;
+                        triangles[tris + 5] = vert + tileSize + 2;
+                        vert++;
+                        tris += 6;
+                    }
+                    vert++;
+                }
+
+                uvs = new Vector2[vertices.Length];
+                for (int iu = 0, zu = 0; zu <= tileSize; zu++)
+                {
+                    for (int xu = 0; xu <= tileSize; xu++)
+                    {
+                        uvs[iu] = new Vector2((float)(xu) / tileSize, (float)(zu) / tileSize);
+                        iu++;
+                    }
+                }
+
+                mesh.Clear();
+
+                mesh.vertices = vertices;
+                mesh.triangles = triangles;
+                mesh.uv = uvs;
+
+                childrenTiles[i].GetComponent<MeshRenderer>().material = terrainMaterial;
+
+                mesh.RecalculateNormals();
+
+                mesh.RecalculateBounds();
+                MeshCollider meshCollider = childrenTiles[i].GetComponent<MeshCollider>();
+                meshCollider.sharedMesh = mesh;
+
+                childrenTiles[i].transform.position += new Vector3(tileSize*x,0,tileSize*z);
             }
         }
-
-
-        mesh = new Mesh();
-        generatedTerrain.GetComponent<MeshFilter>().mesh = mesh;
-
-        Color[] pixels = heightMap.GetPixels(0,0,heightMap.width,heightMap.height);
-
-        vertices = new Vector3[(tileSize + 1) * (tileSize + 1)];
-        for (int i = 0, z = 0; z <= tileSize; z++)
-        {
-            for (int x = 0; x <= tileSize; x++)
-            {
-                //float y = pixels[i].grayscale;
-                Color color = pixels[(z * heightMap.width) + x];
-                vertices[i] = new Vector3(x, color.grayscale*heightMapScale, z);
-                i++;
-            }
-        }
-
-        triangles = new int[tileSize * tileSize * 6];
-        int vert = 0;
-        int tris = 0;
-        for (int z = 0; z < tileSize; z++)
-        {
-            for (int x = 0; x < tileSize; x++)
-            {
-                triangles[tris + 0] = vert + 0;
-                triangles[tris + 1] = vert + tileSize + 1;
-                triangles[tris + 2] = vert + 1;
-                triangles[tris + 3] = vert + 1;
-                triangles[tris + 4] = vert + tileSize + 1;
-                triangles[tris + 5] = vert + tileSize + 2;
-                vert++;
-                tris += 6;
-            }
-            vert++;
-        }
-
-        uvs = new Vector2[vertices.Length];
-        for (int i = 0, z = 0; z <= tileSize; z++)
-        {
-            for (int x = 0; x <= tileSize; x++)
-            {
-                uvs[i] = new Vector2((float) (x) / tileSize, (float) (z) / tileSize);
-                i++;
-            }
-        }
-        UpdateMesh();
     }
-    private void Update()
-    {
-
-    }
-    public void UpdateMesh()
-    {
-        mesh.Clear();
-
-        mesh.vertices = vertices;
-        mesh.triangles = triangles;
-        mesh.uv = uvs;
-
-        generatedTerrain.GetComponent<MeshRenderer>().material = terrainMaterial;
-
-        mesh.RecalculateNormals();
-
-        mesh.RecalculateBounds();
-        MeshCollider meshCollider = generatedTerrain.GetComponent<MeshCollider>();
-        meshCollider.sharedMesh = mesh;
-    }
-
-
-
 }
