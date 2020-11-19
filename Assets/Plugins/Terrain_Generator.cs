@@ -30,11 +30,13 @@ public class Terrain_Generator : EditorWindow
     public int heightMapScale = 20;
     public int heightMapCount = 1;
 
-    Mesh mesh;
+    Mesh[] mesh;
 
-    Vector3[] vertices;
+    Vector3[][] vertices;
     int[] triangles;
     Vector2[] uvs;
+
+    float[][] heightMapdata;
 
     public int tileSize = 64;
 
@@ -142,13 +144,28 @@ public class Terrain_Generator : EditorWindow
         }
 
         GUILayout.Space(10);
-
     }
-    public void  GenerateTerrain()
+    public void GenerateTerrain()
     {
         if (generatedTerrain != null)
         {
             DestroyImmediate(generatedTerrain);
+        }
+
+        mesh = new Mesh[xGridSize * zGridSize];
+
+        heightMapdata = new float[xGridSize * zGridSize][];
+
+        for (int x = 0; x < heightMapdata.Length; x++)
+        {
+            heightMapdata[x] = new float[(tileSize + 1) * (tileSize + 1)];
+        }
+
+        vertices = new Vector3[xGridSize * zGridSize][];
+
+        for (int x = 0; x < vertices.Length; x++)
+        {
+            vertices[x] = new Vector3[(tileSize + 1) * (tileSize + 1)];
         }
 
         tileSize = 250;
@@ -156,6 +173,8 @@ public class Terrain_Generator : EditorWindow
         generatedTerrain = new GameObject("Generated Terrain");
 
         childrenTiles = new GameObject[xGridSize * zGridSize];
+
+        //draw the verts
 
         for (int i = 0, z = 0; z < zGridSize; z++)
         {
@@ -167,43 +186,550 @@ public class Terrain_Generator : EditorWindow
                 childrenTiles[i].AddComponent<MeshRenderer>();
                 childrenTiles[i].AddComponent<MeshCollider>();
 
-                mesh = new Mesh();
-                childrenTiles[i].GetComponent<MeshFilter>().mesh = mesh;
+                mesh[i] = new Mesh();
+                childrenTiles[i].GetComponent<MeshFilter>().mesh = mesh[i];
 
-                Texture2D heightmap = new Texture2D(0,0);
-                int index = (int)UnityEngine.Random.Range(-100,100);
-                if(index <= 0)
+                Texture2D heightmap = new Texture2D(0, 0);
+                int index = (int)UnityEngine.Random.Range(-100, 100);
+                if (index <= 0)
                 {
                     heightmap = heightMap1;
-                    Debug.Log("1");
                 }
                 else if (index > 0)
                 {
                     heightmap = heightMap2;
-                    Debug.Log("2");
                 }
 
-                Color[] pixels = heightmap.GetPixels(0, 0, heightmap.width, heightmap.height);           
+                Color[] pixels = heightmap.GetPixels(0, 0, heightmap.width, heightmap.height);
 
-                vertices = new Vector3[(tileSize + 1) * (tileSize + 1)];
                 for (int iv = 0, zv = 0; zv <= tileSize; zv++)
                 {
                     for (int xv = 0; xv <= tileSize; xv++)
                     {
                         Color color = pixels[(zv * heightmap.width) + xv];
-                        if (xv == 0 || xv == tileSize || zv == 0 || zv == tileSize)
-                        {
-                            //vertices[iv] = new Vector3(xv, 0, zv);
-                            vertices[iv] = new Vector3(xv, color.grayscale * heightMapScale, zv);
-                        }
-                        else
-                        {
-                            vertices[iv] = new Vector3(xv, color.grayscale * heightMapScale, zv);
-                        }
+
+                        vertices[i][iv] = new Vector3(xv, color.grayscale * heightMapScale, zv);
+
+                        heightMapdata[i][iv] = vertices[i][iv].y;
+
                         iv++;
                     }
                 }
+                i++;
+            }
+        }
 
+        //smooth the vertices
+
+        //
+        //current tile: heightMapdata[i][iv]
+        //
+
+        //
+        //N tile: heightMapdata[i + xGridSize][iv]
+        //
+
+        //
+        //E tile: heightMapdata[i + 1][iv]
+        //
+
+        //
+        //S tile: heightMapdata[i - xGridSize][iv]
+        //
+
+        //
+        //W tile: heightMapdata[i - 1][iv]
+        //
+
+        //
+        //NE tile: heightMapdata[i + xGridSize + 1][iv]
+        //
+
+        //
+        //SE tile: heightMapdata[i - xGridSize + 1][iv]
+        //
+
+        //
+        //SW tile: heightMapdata[i - xGridSize - 1][iv]
+        //
+
+        //
+        //NW tile: heightMapdata[i + xGridSize - 1][iv]
+        //
+
+        for (int i = 0, z = 0; z < zGridSize; z++)
+        {
+            for (int x = 0; x < xGridSize; x++)
+            {
+                if (z == 0)
+                {
+                    if (x == 0)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    //Do nothing
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv] + heightMapdata[i + xGridSize + 1][iv] + heightMapdata[i + 1][iv]) / 4;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                   //Do nothing
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]+heightMapdata[i+1][iv])/2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x > 0 && x < xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    //Do nothing
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x == xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][0].y = (heightMapdata[i][0] + heightMapdata[i - 1][tileSize]) / 2;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    //Do nothing
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    //Do nothing
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                }
+                else if (z > 0 && z < zGridSize - 1)
+                {
+                    if (x == 0)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x > 0 && x < xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x == xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + xGridSize][iv]) / 2;
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                }
+                else if (z == zGridSize - 1)
+                {
+                    if (x == 0)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x > 0 && x < xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i + 1][iv]) / 2;
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                    else if (x == xGridSize - 1)
+                    {
+                        for (int iv = 0, zv = 0; zv <= tileSize; zv++)
+                        {
+                            for (int xv = 0; xv <= tileSize; xv++)
+                            {
+                                //bottom left
+                                if (xv == 0 && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 4;
+                                }
+                                //bottom right
+                                else if (xv == tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //top left
+                                else if (xv == 0 && zv == tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv]) / 2;
+                                }
+                                //top right
+                                else if (xv == tileSize && zv == tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //Bottom face
+                                else if (xv > 0 && xv < tileSize && zv == 0)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - xGridSize][iv]) / 2;
+                                }
+                                //left face
+                                else if (xv == 0 && zv > 0 && zv < tileSize)
+                                {
+                                    vertices[i][iv].y = (heightMapdata[i][iv] + heightMapdata[i - 1][iv]) / 2;
+                                }
+                                //right face
+                                else if (xv == tileSize && zv > 0 && zv < tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                //top face
+                                else if (xv > 0 && xv < tileSize && zv == tileSize)
+                                {
+                                    //Do nothing
+                                }
+                                iv++;
+                            }
+                        }
+                    }
+                }
+                i++;
+            }
+        }
+
+        //draw the meshes
+
+        for (int i = 0, z = 0; z < zGridSize; z++)
+        {
+            for (int x = 0; x < xGridSize; x++)
+            {
                 triangles = new int[tileSize * tileSize * 6];
                 int vert = 0;
                 int tris = 0;
@@ -223,7 +749,7 @@ public class Terrain_Generator : EditorWindow
                     vert++;
                 }
 
-                uvs = new Vector2[vertices.Length];
+                uvs = new Vector2[vertices[i].Length];
                 for (int iu = 0, zu = 0; zu <= tileSize; zu++)
                 {
                     for (int xu = 0; xu <= tileSize; xu++)
@@ -233,21 +759,23 @@ public class Terrain_Generator : EditorWindow
                     }
                 }
 
-                mesh.Clear();
+                mesh[i].Clear();
 
-                mesh.vertices = vertices;
-                mesh.triangles = triangles;
-                mesh.uv = uvs;
+                mesh[i].vertices = vertices[i];
+                mesh[i].triangles = triangles;
+                mesh[i].uv = uvs;
 
                 childrenTiles[i].GetComponent<MeshRenderer>().material = terrainMaterial;
 
-                mesh.RecalculateNormals();
+                mesh[i].RecalculateNormals();
 
-                mesh.RecalculateBounds();
+                mesh[i].RecalculateBounds();
                 MeshCollider meshCollider = childrenTiles[i].GetComponent<MeshCollider>();
-                meshCollider.sharedMesh = mesh;
+                meshCollider.sharedMesh = mesh[i];
 
-                childrenTiles[i].transform.position += new Vector3(tileSize*x,0,tileSize*z);
+                childrenTiles[i].transform.position += new Vector3(tileSize * x, 0, tileSize * z);
+
+                i++;
             }
         }
     }
